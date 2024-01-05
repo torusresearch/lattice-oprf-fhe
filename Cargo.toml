@@ -1,0 +1,11 @@
+[package]
+name = "lprf-fhe"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+digest = "0.10.7"
+tfhe = { version = "0.4.1", features = ["boolean", "shortint", "integer", "aarch64-unix"] }
+
+[dev-dependencies]
+sha2 = "0.10.8"
