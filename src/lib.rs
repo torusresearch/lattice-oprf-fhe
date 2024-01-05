@@ -1,4 +1,5 @@
 use digest::Digest;
+use rayon::prelude::*;
 use tfhe::core_crypto::commons::math::random::{ActivatedRandomGenerator, RandomGenerator};
 use tfhe::core_crypto::seeders::new_seeder;
 use tfhe::integer::bigint::static_unsigned::StaticUnsignedBigInt;
@@ -85,14 +86,14 @@ pub fn eval(
     h: &[Vec<RadixCiphertext>],
 ) -> Vec<RadixCiphertext> {
     let v = mat_mul_vec(fhe_key, h, prf_key);
-    v.iter()
+    v.par_iter()
         .map(|x| fhe_key.scalar_right_shift_parallelized(x, LOG2Q - LOG2P))
         .collect()
 }
 
 pub fn decrypt(k: RadixClientKey, ct: &[RadixCiphertext]) -> [u8; OUT_LEN] {
     let v: Vec<_> = ct
-        .iter()
+        .par_iter()
         .flat_map(|cti| {
             const SIZE: usize = Q_BYTES.div_ceil((u64::BITS / u8::BITS) as usize);
             let dec = k.decrypt::<StaticUnsignedBigInt<SIZE>>(cti);

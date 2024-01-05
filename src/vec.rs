@@ -1,8 +1,9 @@
+use rayon::prelude::*;
 use tfhe::integer::{RadixCiphertext, ServerKey};
 
 pub fn vec_mul_vec(k: &ServerKey, m: &[RadixCiphertext], v: &[RadixCiphertext]) -> RadixCiphertext {
     let v: Vec<_> = m
-        .iter()
+        .par_iter()
         .zip(v)
         .map(|(a, b)| k.mul_parallelized(a, b))
         .collect();
@@ -14,5 +15,5 @@ pub fn mat_mul_vec(
     m: &[Vec<RadixCiphertext>],
     v: &[RadixCiphertext],
 ) -> Vec<RadixCiphertext> {
-    m.iter().map(|row| vec_mul_vec(k, row, v)).collect()
+    m.par_iter().map(|row| vec_mul_vec(k, row, v)).collect()
 }

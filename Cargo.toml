@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 digest = "0.10.7"
+rayon = "1.8.0"
 tfhe = { version = "0.4.1", features = ["boolean", "shortint", "integer", "aarch64-unix"] }
 
 [dev-dependencies]
