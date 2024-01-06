@@ -11,7 +11,7 @@ use vec::mat_mul_vec;
 mod vec;
 
 // PRF parameters.
-const LATTICE_DIM: usize = 8; // 512;
+const LATTICE_DIM: usize = 16; // 512;
 const LOG2Q: usize = 12;
 const LOG2P: usize = 8;
 const OUT_LEN: usize = 16;
@@ -85,10 +85,17 @@ pub fn eval(
     prf_key: &[BigInt],
     h: &[Vec<RadixCiphertext>],
 ) -> Vec<RadixCiphertext> {
+    let now = std::time::SystemTime::now();
     let v = mat_mul_vec(fhe_key, h, prf_key);
-    v.par_iter()
+    println!("eval: mat_mul_vec: elpased: {:?}", now.elapsed());
+
+    let now = std::time::SystemTime::now();
+    let y = v
+        .par_iter()
         .map(|x| fhe_key.scalar_right_shift_parallelized(x, LOG2Q - LOG2P))
-        .collect()
+        .collect();
+    println!("eval: right_shift: elpased: {:?}", now.elapsed());
+    y
 }
 
 pub fn decrypt(k: RadixClientKey, ct: &[RadixCiphertext]) -> [u8; OUT_LEN] {

@@ -17,5 +17,12 @@ pub fn mat_mul_vec(
     m: &[Vec<RadixCiphertext>],
     v: &[BigInt],
 ) -> Vec<RadixCiphertext> {
-    m.par_iter().map(|row| vec_mul_vec(k, row, v)).collect()
+    m.par_iter()
+        .map(|row| {
+            let now = std::time::SystemTime::now();
+            let y = vec_mul_vec(k, row, v);
+            println!("mat_mul_vec: vec_mul_vec: elpased: {:?}", now.elapsed());
+            y
+        })
+        .collect()
 }
