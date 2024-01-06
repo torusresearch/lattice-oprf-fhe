@@ -23,12 +23,29 @@ const NUM_BLOCKS: usize = LOG2Q / FHE_PARAMS.message_modulus.0.ilog2() as usize;
 // Derived constants.
 const Q_BYTES: usize = LOG2Q.div_ceil(u8::BITS as usize);
 const P_BYTES: usize = LOG2P.div_ceil(u8::BITS as usize);
+const Q_BIGINT_SIZE: usize = Q_BYTES.div_ceil((u64::BITS / u8::BITS) as usize);
+
+// Derived types.
+type BigInt = StaticUnsignedBigInt<Q_BIGINT_SIZE>;
 
 pub fn generate_fhe_keys() -> (RadixClientKey, ServerKey) {
     gen_keys_radix(PARAM_MESSAGE_2_CARRY_2_KS_PBS, NUM_BLOCKS)
 }
 
-pub fn generate_prf_key(k: &ServerKey) -> Vec<RadixCiphertext> {
+fn generate_random_mod_q(rng: &mut RandomGenerator<ActivatedRandomGenerator>) -> BigInt {
+    let q = BigInt::from([1]) << LOG2Q as u32;
+
+    // Generate random value in 0..q.
+    let mut buf = [0u8; BigInt::BITS.div_ceil(u8::BITS) as usize];
+    rng.fill_slice_with_random_uniform(&mut buf);
+
+    let mut r = BigInt::default();
+    r.copy_from_le_byte_slice(&buf);
+
+    r % q
+}
+
+pub fn generate_prf_key() -> Vec<BigInt> {
     // Initialize PRNG.
     let mut seeder = new_seeder();
     let seed = seeder.seed();
@@ -38,17 +55,7 @@ pub fn generate_prf_key(k: &ServerKey) -> Vec<RadixCiphertext> {
     rng.fill_slice_with_random_uniform(&mut bytes);
 
     (0..LATTICE_DIM)
-        .map(|_| {
-            // Generate random value in 0..q.
-            const SIZE: usize = Q_BYTES.div_ceil((u64::BITS / u8::BITS) as usize);
-            let mut buf = [0u8; SIZE * (u64::BITS / u8::BITS) as usize];
-            rng.fill_slice_with_random_uniform(&mut buf);
-
-            let mut r = StaticUnsignedBigInt::<SIZE>::default();
-            r.copy_from_le_byte_slice(&buf);
-
-            k.create_trivial_radix(r, NUM_BLOCKS)
-        })
+        .map(|_| generate_random_mod_q(&mut rng))
         .collect()
 }
 
@@ -65,14 +72,7 @@ pub fn encode<D: Digest>(k: &RadixClientKey, x: &[u8]) -> Vec<Vec<RadixCiphertex
         .map(|_| {
             (0..LATTICE_DIM)
                 .map(|_| {
-                    // Generate random value in 0..q.
-                    const SIZE: usize = Q_BYTES.div_ceil((u64::BITS / u8::BITS) as usize);
-                    let mut buf = [0u8; SIZE * (u64::BITS / u8::BITS) as usize];
-                    rng.fill_slice_with_random_uniform(&mut buf);
-
-                    let mut r = StaticUnsignedBigInt::<SIZE>::default();
-                    r.copy_from_le_byte_slice(&buf);
-
+                    let r = generate_random_mod_q(&mut rng);
                     k.encrypt(r)
                 })
                 .collect()
@@ -82,7 +82,7 @@ pub fn encode<D: Digest>(k: &RadixClientKey, x: &[u8]) -> Vec<Vec<RadixCiphertex
 
 pub fn eval(
     fhe_key: &ServerKey,
-    prf_key: &[RadixCiphertext],
+    prf_key: &[BigInt],
     h: &[Vec<RadixCiphertext>],
 ) -> Vec<RadixCiphertext> {
     let v = mat_mul_vec(fhe_key, h, prf_key);
@@ -115,7 +115,7 @@ mod tests {
     #[test]
     fn prf() {
         let (ck, sk) = generate_fhe_keys();
-        let pk = generate_prf_key(&sk);
+        let pk = generate_prf_key();
 
         // Encode input.
         let x = vec![1, 2, 3];
